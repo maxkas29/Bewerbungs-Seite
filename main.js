@@ -18,7 +18,7 @@ loadingManager.onLoad = () => {
         loader.style.display = 'none';
     }
     setTimeout(() => {
-        showModal("<h2>Willkommen!</h2><p>Steuere das UFO mit den <b>Pfeiltasten</b>.</p><p>Deine Aufgabe: <b>Sammle Informationen über Maximilian.</b></p>");
+        showModal("<h2>Bitte kommen team<span style='color: #fff; background-color: #ff0000'>4</span><b>media</b>!</h2> <p>Wir haben eine Person für euch gefunden die gutes Potenzial hat im Unternhemen mit einzusteigen. Nur sind uns einige Informationen verloren gegangen. </p> <p><b>Mission:</b> Sammle Informationen über Maximilian.</p><p>Steuere das UFO mit den <b>Pfeiltasten</b>.</p>");
     }, 500);
 };
 const textureLoader = new THREE.TextureLoader(loadingManager);
@@ -82,7 +82,7 @@ mtlLoader.load('assets/obj/UFO.mtl', (materials) => {
     objLoader.setMaterials(materials);
     objLoader.load('assets/obj/UFO.obj', (object) => {
         cube = object;
-        cube.position.set(0, hoverHeight, 0);
+        cube.position.set(0, 40, 0); // Spawnt oben unsichtbar
         cube.scale.set(0.0095, 0.0095, 0.0095);
         cube.rotation.x = Math.PI / 2;
         cube.traverse((child) => {
@@ -124,8 +124,8 @@ const collectData = [
         z: 8,
         category: "Projekte",
         title: "Werkstudententätigkeit",
-        text: "Erstellung einer Webanwendung für ein Catering-Unternehmen, um deren Bestellprozess zu optimieren.",
-        info: "Werkstudententätigkeit: Eigenständige Betreuung eines Projektes"
+        text: "Erstellung einer Webanwendung für ein Catering-Unternehmen, um deren Bestellprozess zu optimieren. Sowie die Entwicklung einer KI gestützten und Automatisierten SocialMedia Präsenz.",
+        info: "Werkstudententätigkeit: Eigenständige Betreuung eines Projektes- Automatisierung und KI"
     }
 ];
 const greenCubes = [];
@@ -285,6 +285,8 @@ const keys = {
     ArrowRight: false,
 };
 let isModalOpen = false;
+let isAnimatingStart = false; // Flag für die Drop-Down Start-Animation
+let hasGameStarted = false; // Verhindert Physik- und Laser-Updates in den ersten Millisekunden vor dem Modal
 const modal = document.getElementById("modal");
 const modalText = document.getElementById("modal-text");
 const closeBtn = document.getElementById("close-btn");
@@ -378,6 +380,25 @@ function closeModal() {
         previewScene.remove(previewObject);
         previewObject = null;
     }
+
+    // Wenn es sich um das Start-Modal handelt (kein currentCubeToCollect), triggern wir die Animation
+    if (!currentCubeToCollect && cube && !hasGameStarted) {
+        hasGameStarted = true;
+        cube.position.y = 40; // UFO weit nach oben setzen
+        isAnimatingStart = true;
+
+        // Verstecke alle versehentlich erzeugten Laserpartikel
+        if (typeof particleCount !== 'undefined') {
+            for (let i = 0; i < particleCount; i++) {
+                particlePositions[i * 3 + 1] = -5000;
+                particleOpacities[i] = 0;
+                if (particlesData[i]) particlesData[i].life = 0;
+            }
+            if (particlesGeometry.attributes.position) particlesGeometry.attributes.position.needsUpdate = true;
+            if (particlesGeometry.attributes.opacity) particlesGeometry.attributes.opacity.needsUpdate = true;
+        }
+    }
+
     currentCubeToCollect = null;
     const existingBtn = document.getElementById("action-btn");
     if (existingBtn) existingBtn.remove();
@@ -480,7 +501,24 @@ for (let i = 0; i < particleCount; i++) {
 let particleIndex = 0;
 function animate() {
     requestAnimationFrame(animate);
-    if (!isModalOpen && cube) {
+
+    if (!hasGameStarted) {
+        // Verhindere Laser- und Physik-Updates, bevor der Nutzer gestartet hat
+        renderer.render(scene, camera);
+        return;
+    }
+
+    if (isAnimatingStart && cube) {
+        // Einflug-Animation: Sanftes Absinken zur hoverHeight
+        cube.position.y -= (cube.position.y - hoverHeight) * 0.05; // Ease-Out Effekt
+        cube.rotation.z -= 0.05; // Schneller spin beim reinfliegen
+
+        // Sobald es nah genug an der Zielhöhe ist, Animation beenden
+        if (Math.abs(cube.position.y - hoverHeight) < 0.05) {
+            cube.position.y = hoverHeight;
+            isAnimatingStart = false;
+        }
+    } else if (!isModalOpen && cube) {
         const acceleration = 0.015;
         const friction = 0.92;
         const maxSpeed = 0.4;
@@ -585,109 +623,113 @@ function animate() {
                 }
             }
         }
-        const beamSpeed = 0.08;
-        const spawnCount = 2;
-        for (let k = 0; k < spawnCount; k++) {
-            const i = particleIndex;
-            const data = particlesData[i];
-            let startX, startY, startZ;
-            if (closestCube && closestCube.position.distanceTo(cube.position) < attractionRange) {
-                const width = 1.0;
-                startX = closestCube.position.x + (Math.random() - 0.5) * width;
-                startY = closestCube.position.y + 0.5;
-                startZ = closestCube.position.z + (Math.random() - 0.5) * width;
-                data.type = 'attract';
-            } else {
-                const groundY = 0;
-                const beamWidth = 0.8;
-                const offX = (Math.random() - 0.5) * beamWidth;
-                const offZ = (Math.random() - 0.5) * beamWidth;
-                data.offsetX = offX;
-                data.offsetZ = offZ;
-                data.type = 'idle';
-                startX = cube.position.x + offX;
-                startY = groundY;
-                startZ = cube.position.z + offZ;
-            }
-            particlePositions[i * 3] = startX;
-            particlePositions[i * 3 + 1] = startY;
-            particlePositions[i * 3 + 2] = startZ;
-            if (data.type === 'attract') {
-                const targetX = cube.position.x;
-                const targetY = cube.position.y - 0.5;
-                const targetZ = cube.position.z;
-                const dx = targetX - startX;
-                const dy = targetY - startY;
-                const dz = targetZ - startZ;
-                const len = Math.sqrt(dx * dx + dy * dy + dz * dz);
-                if (len > 0) {
-                    data.velocity.set(
-                        (dx / len) * beamSpeed,
-                        (dy / len) * beamSpeed,
-                        (dz / len) * beamSpeed
-                    );
+
+        if (!isAnimatingStart) {
+            const beamSpeed = 0.08;
+            const spawnCount = 2;
+            for (let k = 0; k < spawnCount; k++) {
+                const i = particleIndex;
+                const data = particlesData[i];
+                let startX, startY, startZ;
+                if (closestCube && closestCube.position.distanceTo(cube.position) < attractionRange) {
+                    const width = 1.0;
+                    startX = closestCube.position.x + (Math.random() - 0.5) * width;
+                    startY = closestCube.position.y + 0.5;
+                    startZ = closestCube.position.z + (Math.random() - 0.5) * width;
+                    data.type = 'attract';
                 } else {
-                    data.velocity.set(0, beamSpeed, 0);
+                    const groundY = 0;
+                    const beamWidth = 0.8;
+                    const offX = (Math.random() - 0.5) * beamWidth;
+                    const offZ = (Math.random() - 0.5) * beamWidth;
+                    data.offsetX = offX;
+                    data.offsetZ = offZ;
+                    data.type = 'idle';
+                    startX = cube.position.x + offX;
+                    startY = groundY;
+                    startZ = cube.position.z + offZ;
                 }
-            } else {
-                data.velocity.set(0, beamSpeed, 0);
-            }
-            data.life = 1.0;
-            data.maxLife = 1.0;
-            particleOpacities[i] = 1.0;
-            particleSizes[i] = 0.4;
-            particleIndex = (particleIndex + 1) % particleCount;
-        }
-        for (let i = 0; i < particleCount; i++) {
-            const data = particlesData[i];
-            if (data.life > 0) {
-                if (data.type === 'idle') {
-                    particlePositions[i * 3] = cube.position.x + data.offsetX;
-                    particlePositions[i * 3 + 2] = cube.position.z + data.offsetZ;
-                    particlePositions[i * 3 + 1] += data.velocity.y;
-                    if (particlePositions[i * 3 + 1] > cube.position.y - 0.5) {
-                        data.life = 0;
-                    }
-                } else {
-                    const pX = particlePositions[i * 3];
-                    const pY = particlePositions[i * 3 + 1];
-                    const pZ = particlePositions[i * 3 + 2];
+                particlePositions[i * 3] = startX;
+                particlePositions[i * 3 + 1] = startY;
+                particlePositions[i * 3 + 2] = startZ;
+                if (data.type === 'attract') {
                     const targetX = cube.position.x;
                     const targetY = cube.position.y - 0.5;
                     const targetZ = cube.position.z;
-                    const dx = targetX - pX;
-                    const dy = targetY - pY;
-                    const dz = targetZ - pZ;
-                    const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-                    if (dist > 0) {
-                        const speed = 0.08;
+                    const dx = targetX - startX;
+                    const dy = targetY - startY;
+                    const dz = targetZ - startZ;
+                    const len = Math.sqrt(dx * dx + dy * dy + dz * dz);
+                    if (len > 0) {
                         data.velocity.set(
-                            (dx / dist) * speed,
-                            (dy / dist) * speed,
-                            (dz / dist) * speed
+                            (dx / len) * beamSpeed,
+                            (dy / len) * beamSpeed,
+                            (dz / len) * beamSpeed
                         );
+                    } else {
+                        data.velocity.set(0, beamSpeed, 0);
                     }
-                    particlePositions[i * 3] += data.velocity.x;
-                    particlePositions[i * 3 + 1] += data.velocity.y;
-                    particlePositions[i * 3 + 2] += data.velocity.z;
-                    if (particlePositions[i * 3 + 1] > cube.position.y - 0.2) {
-                        data.life = 0;
-                    }
+                } else {
+                    data.velocity.set(0, beamSpeed, 0);
                 }
-                particleOpacities[i] = data.life;
+                data.life = 1.0;
+                data.maxLife = 1.0;
+                particleOpacities[i] = 1.0;
                 particleSizes[i] = 0.4;
-                if (data.life <= 0) {
-                    particlePositions[i * 3 + 1] = -5000;
-                    particleOpacities[i] = 0;
+                particleIndex = (particleIndex + 1) % particleCount;
+            }
+            for (let i = 0; i < particleCount; i++) {
+                const data = particlesData[i];
+                if (data.life > 0) {
+                    if (data.type === 'idle') {
+                        particlePositions[i * 3] = cube.position.x + data.offsetX;
+                        particlePositions[i * 3 + 2] = cube.position.z + data.offsetZ;
+                        particlePositions[i * 3 + 1] += data.velocity.y;
+                        if (particlePositions[i * 3 + 1] > cube.position.y - 0.5) {
+                            data.life = 0;
+                        }
+                    } else {
+                        const pX = particlePositions[i * 3];
+                        const pY = particlePositions[i * 3 + 1];
+                        const pZ = particlePositions[i * 3 + 2];
+                        const targetX = cube.position.x;
+                        const targetY = cube.position.y - 0.5;
+                        const targetZ = cube.position.z;
+                        const dx = targetX - pX;
+                        const dy = targetY - pY;
+                        const dz = targetZ - pZ;
+                        const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+                        if (dist > 0) {
+                            const speed = 0.08;
+                            data.velocity.set(
+                                (dx / dist) * speed,
+                                (dy / dist) * speed,
+                                (dz / dist) * speed
+                            );
+                        }
+                        particlePositions[i * 3] += data.velocity.x;
+                        particlePositions[i * 3 + 1] += data.velocity.y;
+                        particlePositions[i * 3 + 2] += data.velocity.z;
+                        if (particlePositions[i * 3 + 1] > cube.position.y - 0.2) {
+                            data.life = 0;
+                        }
+                    }
+                    particleOpacities[i] = data.life;
+                    particleSizes[i] = 0.4;
+                    if (data.life <= 0) {
+                        particlePositions[i * 3 + 1] = -5000;
+                        particleOpacities[i] = 0;
+                    }
                 }
             }
+            particlesGeometry.attributes.position.needsUpdate = true;
+            particlesGeometry.attributes.opacity.needsUpdate = true;
+            particlesGeometry.attributes.size.needsUpdate = true;
         }
-        particlesGeometry.attributes.position.needsUpdate = true;
-        particlesGeometry.attributes.opacity.needsUpdate = true;
-        particlesGeometry.attributes.size.needsUpdate = true;
     }
     renderer.render(scene, camera);
-}
+} // End of animate function
+
 window.addEventListener('resize', () => {
     const targetAspect = 16 / 9;
     const margin = 0.9;
@@ -708,7 +750,9 @@ window.addEventListener('resize', () => {
     camera.updateProjectionMatrix();
     renderer.setSize(renderWidth, renderHeight);
 });
+
 animate();
+
 const initialCounterEl = document.getElementById("collection-counter");
 if (initialCounterEl && typeof collectData !== 'undefined') {
     initialCounterEl.innerText = `0 / ${collectData.length}`;
