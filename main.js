@@ -18,7 +18,7 @@ loadingManager.onLoad = () => {
         loader.style.display = 'none';
     }
     setTimeout(() => {
-        showModal("<h2>Bitte kommen team<span style='color: #fff; background-color: #ff0000'>4</span><b>media</b>!</h2> <p>Wir haben eine Person für euch gefunden die gutes Potenzial hat im Unternhemen mit einzusteigen. Nur sind uns einige Informationen verloren gegangen. </p> <p><b>Mission:</b> Sammle Informationen über Maximilian.</p><p>Steuere das UFO mit den <b>Pfeiltasten</b>.</p>");
+        showModal("<h2>Bitte kommen <span style='color: #b3ce54ff;'>HOCH5</span>!</h2> <p>Wir haben eine Person für euch gefunden die gutes Potenzial hat im Unternhemen mit einzusteigen. Nur sind uns einige Informationen verloren gegangen. </p> <p><b>Mission:</b> Sammle Informationen über Maximilian.</p><p>Steuere das UFO mit den <b>Pfeiltasten</b>.</p>");
     }, 500);
 };
 const textureLoader = new THREE.TextureLoader(loadingManager);
@@ -314,6 +314,34 @@ function animatePreview() {
     }
     previewRenderer.render(previewScene, previewCamera);
 }
+
+const ufoPreviewContainer = document.getElementById("ufo-preview");
+const ufoPreviewScene = new THREE.Scene();
+const ufoPreviewCamera = new THREE.PerspectiveCamera(50, 800 / 400, 0.1, 100);
+ufoPreviewCamera.position.set(0, 1, 4);
+ufoPreviewCamera.lookAt(0, 0, 0);
+const ufoPreviewRenderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+ufoPreviewRenderer.setSize(800, 400);
+if (ufoPreviewContainer) {
+    ufoPreviewContainer.appendChild(ufoPreviewRenderer.domElement);
+}
+const ufoPreviewAmbient = new THREE.AmbientLight(0xffffff, 0.8);
+ufoPreviewScene.add(ufoPreviewAmbient);
+const ufoPreviewDirLight = new THREE.DirectionalLight(0xffffff, 1.0);
+ufoPreviewDirLight.position.set(2, 5, 2);
+ufoPreviewScene.add(ufoPreviewDirLight);
+let ufoPreviewAnimationId = null;
+let ufoPreviewObject = null;
+
+function animateUfoPreview() {
+    ufoPreviewAnimationId = requestAnimationFrame(animateUfoPreview);
+    if (ufoPreviewObject) {
+        ufoPreviewObject.rotation.y -= 0.005;
+        const time = Date.now() * 0.002;
+        ufoPreviewObject.position.y = Math.sin(time) * 0.1 + 0.4;
+    }
+    ufoPreviewRenderer.render(ufoPreviewScene, ufoPreviewCamera);
+}
 function showModal(text, cubeObject = null) {
     if (isModalOpen) return;
     isModalOpen = true;
@@ -328,6 +356,19 @@ function showModal(text, cubeObject = null) {
             profileCard.style.display = 'flex';
         }
     }
+
+    if (ufoPreviewAnimationId) {
+        cancelAnimationFrame(ufoPreviewAnimationId);
+        ufoPreviewAnimationId = null;
+    }
+    if (ufoPreviewContainer) {
+        ufoPreviewContainer.style.display = 'none';
+        if (ufoPreviewObject) {
+            ufoPreviewScene.remove(ufoPreviewObject);
+            ufoPreviewObject = null;
+        }
+    }
+
     if (cubeObject) {
         modalPreviewContainer.style.display = 'block';
         if (previewObject) {
@@ -343,6 +384,19 @@ function showModal(text, cubeObject = null) {
         animatePreview();
     } else {
         modalPreviewContainer.style.display = 'none';
+
+        if (ufoPreviewContainer && typeof cube !== 'undefined' && cube) {
+            ufoPreviewContainer.style.display = 'block';
+            ufoPreviewObject = new THREE.Group();
+            const clonedUfo = cube.clone();
+            clonedUfo.position.set(0, 0, 0);
+            clonedUfo.rotation.copy(cube.rotation);
+            ufoPreviewObject.rotation.x = Math.PI / 10;
+            ufoPreviewObject.scale.set(1.5, 1.5, 1.5);
+            ufoPreviewObject.add(clonedUfo);
+            ufoPreviewScene.add(ufoPreviewObject);
+            animateUfoPreview();
+        }
     }
     const existingBtn = document.getElementById("action-btn");
     if (existingBtn) existingBtn.remove();
@@ -379,6 +433,14 @@ function closeModal() {
     if (previewObject) {
         previewScene.remove(previewObject);
         previewObject = null;
+    }
+    if (ufoPreviewAnimationId) {
+        cancelAnimationFrame(ufoPreviewAnimationId);
+        ufoPreviewAnimationId = null;
+    }
+    if (ufoPreviewObject) {
+        ufoPreviewScene.remove(ufoPreviewObject);
+        ufoPreviewObject = null;
     }
 
     // Wenn es sich um das Start-Modal handelt (kein currentCubeToCollect), triggern wir die Animation
