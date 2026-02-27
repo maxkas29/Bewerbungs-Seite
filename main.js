@@ -322,6 +322,9 @@ ufoPreviewCamera.position.set(0, 1, 4);
 ufoPreviewCamera.lookAt(0, 0, 0);
 const ufoPreviewRenderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
 ufoPreviewRenderer.setSize(800, 400);
+ufoPreviewRenderer.domElement.style.width = '100%';
+ufoPreviewRenderer.domElement.style.height = '100%';
+ufoPreviewRenderer.domElement.style.objectFit = 'contain';
 if (ufoPreviewContainer) {
     ufoPreviewContainer.appendChild(ufoPreviewRenderer.domElement);
 }
